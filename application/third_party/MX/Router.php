@@ -40,21 +40,30 @@ class MX_Router extends CI_Router
 	public $module;
 	private $located = 0;
 
+    /**
+     * 获取模块名，只有定位到模块才有
+     * @return mixed
+     */
 	public function fetch_module()
 	{
 		return $this->module;
 	}
 
+    /**
+     * 重写_set_request方法
+     * @param array $segments
+     */
 	protected function _set_request($segments = array())
 	{
 		if ($this->translate_uri_dashes === TRUE)
 		{
+		    // 路由的value可能包含三部分 模块、控制器、方法
 			foreach(range(0, 2) as $v)
 			{
 				isset($segments[$v]) && $segments[$v] = str_replace('-', '_', $segments[$v]);
 			}
 		}
-		
+
 		$segments = $this->locate($segments);
 
 		if($this->located == -1)
@@ -106,15 +115,20 @@ class MX_Router extends CI_Router
 		}
 	}
 
-	/** Locate the controller **/
+    /**
+     *  定位控制器
+     * @param $segments welcome/null/null | test/test/index
+     * @return array|void
+     */
 	public function locate($segments)
 	{
 		$this->located = 0;
-		$ext = $this->config->item('controller_suffix').EXT;
+		$ext = $this->config->item('controller_suffix').EXT;// 这里说明HMVC支持控制器后缀可配置
 
-		/* use module route if available */
+		/* $segments[0]表示模块，这里是去模块下找路由配置文件，找到就用该模块下的路由配置 */
 		if (isset($segments[0]) && $routes = Modules::parse_routes($segments[0], implode('/', $segments)))
 		{
+		    // $routes为[$segments[0]，$route[$segments[0]]]
 			$segments = $routes;
 		}
 
@@ -124,44 +138,48 @@ class MX_Router extends CI_Router
 		/* check modules */
 		foreach (Modules::$locations as $location => $offset)
 		{
-			/* module exists? */
+			/* 模块是否存在 */
 			if (is_dir($source = $location.$module.'/controllers/'))
 			{
 				$this->module = $module;
 				$this->directory = $offset.$module.'/controllers/';
 
-				/* module sub-controller exists? */
+				/* 子控制器是否存在 */
 				if($directory)
 				{
-					/* module sub-directory exists? */
+					/* controller下是否有子目录，也就是子控制器 */
+                    // 比如: APPPATH . 'modules/test/controllers/test/'
 					if(is_dir($source.$directory.'/'))
 					{	
 						$source .= $directory.'/';
 						$this->directory .= $directory.'/';
 
-						/* module sub-directory controller exists? */
+						/* 子控制器是否存在 */
 						if($controller)
 						{
+						    // APPPATH . 'modules/test/controllers/test/Test.php'
 							if(is_file($source.ucfirst($controller).$ext))
 							{
-								$this->located = 3;
+								$this->located = 3;// 模块 控制器 子控制器
 								return array_slice($segments, 2);
 							}
 							else $this->located = -1;
 						}
 					}
 					else
+					    // APPPATH . 'modules/test/controllers/Test.php'
 					if(is_file($source.ucfirst($directory).$ext))
 					{
-						$this->located = 2;
+						$this->located = 2;// 模块 控制器(directory)
 						return array_slice($segments, 1);
 					}
 					else $this->located = -1;
 				}
 
 				/* module controller exists? */
+                // APPPATH . 'modules/test/controller/Test.php
 				if(is_file($source.ucfirst($module).$ext))
-				{
+				{// 模块 控制器(module)
 					$this->located = 1;
 					return $segments;
 				}
@@ -173,6 +191,7 @@ class MX_Router extends CI_Router
 		/* application sub-directory controller exists? */
 		if($directory)
 		{
+		    // 模块作为控制器子目录 APPPATH . 'controllers/test/Test.php'
 			if(is_file(APPPATH.'controllers/'.$module.'/'.ucfirst($directory).$ext))
 			{
 				$this->directory = $module.'/';
@@ -181,7 +200,8 @@ class MX_Router extends CI_Router
 
 			/* application sub-sub-directory controller exists? */
 			if($controller)
-			{ 
+			{
+			    // APPPATH . 'controllers/test/test/Test.php'
 				if(is_file(APPPATH.'controllers/'.$module.'/'.$directory.'/'.ucfirst($controller).$ext))
 				{
 					$this->directory = $module.'/'.$directory.'/';
@@ -191,6 +211,7 @@ class MX_Router extends CI_Router
 		}
 
 		/* application controllers sub-directory exists? */
+        // APPPATH . 'controllers/test/'
 		if (is_dir(APPPATH.'controllers/'.$module.'/'))
 		{
 			$this->directory = $module.'/';
@@ -198,6 +219,7 @@ class MX_Router extends CI_Router
 		}
 
 		/* application controller exists? */
+        // APPPATH . 'controllers/Test.php'
 		if (is_file(APPPATH.'controllers/'.ucfirst($module).$ext))
 		{
 			return $segments;
@@ -206,21 +228,22 @@ class MX_Router extends CI_Router
 		$this->located = -1;
 	}
 
-	/* set module path */
+	/* 默认控制器和404重定向控制器调用此方法 */
 	protected function _set_module_path(&$_route)
 	{
 		if ( ! empty($_route))
 		{
-			// Are module/directory/controller/method segments being specified?
+			// 将$_route解析到$module $directory $class $method，并返回解析值的个数
+            // 比如默认控制器，$_route = 'welcome';
 			$sgs = sscanf($_route, '%[^/]/%[^/]/%[^/]/%s', $module, $directory, $class, $method);
-			
-			// set the module/controller directory location if found
+
+			// set the module/controller directory location if found 没找到传空
 			if ($this->locate(array($module, $directory, $class)))
 			{
 				//reset to class/method
 				switch ($sgs)
 				{
-					case 1:	$_route = $module.'/index';
+					case 1:	$_route = $module.'/index';// welcome/index
 						break;
 					case 2: $_route = ($this->located < 2) ? $module.'/'.$directory : $directory.'/index';
 						break;
@@ -235,6 +258,7 @@ class MX_Router extends CI_Router
 
 	public function set_class($class)
 	{
+	    // HMVC模式下控制器类可自定义后缀，如果设置了后缀则补上
 		$suffix = $this->config->item('controller_suffix');
 		if (strpos($class, $suffix) === FALSE)
 		{

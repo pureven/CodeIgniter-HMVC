@@ -150,8 +150,7 @@ if ( ! function_exists('load_class'))
 
 		$name = FALSE;
 
-		// Look for the class first in the local application/libraries folder
-		// then in the native system/libraries folder
+		// 如果APPPATH目录下存在则加载APPPATH目录下的，如果没有再加载BASEPATH目录下的
 		foreach (array(APPPATH, BASEPATH) as $path)
 		{
 			if (file_exists($path.$directory.'/'.$class.'.php'))
@@ -167,7 +166,7 @@ if ( ! function_exists('load_class'))
 			}
 		}
 
-		// Is the request a class extension? If so we load it too
+		// 有前缀则加载带前缀的类，比如MY_Loader，MY_Router等，HMVC实现过程中便是加载的MY_Loader MY_Router
 		if (file_exists(APPPATH.$directory.'/'.config_item('subclass_prefix').$class.'.php'))
 		{
 			$name = config_item('subclass_prefix').$class;
@@ -191,6 +190,7 @@ if ( ! function_exists('load_class'))
 		// Keep track of what we just loaded
 		is_loaded($class);
 
+		// 这里已经完成了基类和扩展类的加载，最后将扩展类实例化
 		$_classes[$class] = isset($param)
 			? new $name($param)
 			: new $name();

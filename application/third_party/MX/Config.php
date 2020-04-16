@@ -34,14 +34,24 @@
  * THE SOFTWARE.
  **/
 class MX_Config extends CI_Config 
-{	
+{
+    /**
+     * 加载指定配置文件，(设置好自动加载配置后测试，比如:$autoload['config'] = array('config'))
+     * @param string $file
+     * @param bool $use_sections
+     * @param bool $fail_gracefully
+     * @param string $_module
+     * @return bool|null|string
+     */
 	public function load($file = '', $use_sections = FALSE, $fail_gracefully = FALSE, $_module = '') 
 	{
+	    // 如果已加载了就返回
 		if (in_array($file, $this->is_loaded, TRUE)) return $this->item($file);
 
 		$_module OR $_module = CI::$APP->router->fetch_module();
-		list($path, $file) = Modules::find($file, $_module, 'config/');
-		
+		list($path, $file) = Modules::find($file, $_module, 'config/');// 模块配置文件路径、文件名
+
+        // 没找到则说明模块下没有了，去APPPATH下找
 		if ($path === FALSE)
 		{
 			parent::load($file, $use_sections, $fail_gracefully);					
@@ -50,13 +60,14 @@ class MX_Config extends CI_Config
 		
 		if ($config = Modules::load_file($file, $path, 'config'))
 		{
-			/* reference to the config array */
+			/* 引用父类的config变量，表示所有已加载的配置项 */
 			$current_config =& $this->config;
 
 			if ($use_sections === TRUE)	
 			{
 				if (isset($current_config[$file])) 
 				{
+				    // 如果加载过则合并，这里用的array_merge函数表示后面的值将覆盖前面设置的值
 					$current_config[$file] = array_merge($current_config[$file], $config);
 				} 
 				else 

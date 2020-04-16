@@ -1,15 +1,21 @@
 <?php (defined('BASEPATH')) OR exit('No direct script access allowed');
 
+// 该文件在MX_Router文件中加载
+// 默认扩展名.php
 (defined('EXT')) OR define('EXT', '.php');
 
+// 这里的$CFG在CI类中定义： if ( ! $CFG instanceof MX_Config) $CFG = new MX_Config;
 global $CFG;
 
-/* get module locations from config settings or use the default module location and offset */
+// 这里的modules_locations可在config.php中定义，如果没有定义就用默认的
+// 默认：[APPPATH . 'modules/' => '../modules/']
 is_array(Modules::$locations = $CFG->item('modules_locations')) OR Modules::$locations = array(
 	APPPATH.'modules/' => '../modules/',
 );
 
 /* PHP5 spl_autoload */
+// 将Modules::autoload()静态方法注册到SPL __autoload函数队列中作为__autoload的实现
+// 当发现待使用的类未加载时就使用该方法加载对应的类文件
 spl_autoload_register('Modules::autoload');
 
 /**
@@ -47,6 +53,7 @@ spl_autoload_register('Modules::autoload');
  **/
 class Modules
 {
+    // $routes用于存放模块下是否包含路由文件
 	public static $routes, $registry, $locations;
 	
 	/**
@@ -112,12 +119,13 @@ class Modules
 	/** Library base class autoload **/
 	public static function autoload($class) 
 	{	
-		/* don't autoload CI_ prefixed classes or those using the config subclass_prefix */
+		// 这里不加载'CI_'或'MY_'开头的类
 		if (strstr($class, 'CI_') OR strstr($class, config_item('subclass_prefix'))) return;
 
-		/* autoload Modular Extensions MX core classes */
+		// HMVC扩展类大都时MX目录下的并且'MX_'开头，这里负责加载'MX_'开头的类文件
 		if (strstr($class, 'MX_')) 
 		{
+		    // 举例：$location = .../application/third_party/MX/Loader.php
 			if (is_file($location = dirname(__FILE__).'/'.substr($class, 3).EXT)) 
 			{
 				include_once $location;
@@ -126,14 +134,14 @@ class Modules
 			show_error('Failed to load MX core class: '.$class);
 		}
 		
-		/* autoload core classes */
+		// 加载'application/core/'目录下的类文件
 		if(is_file($location = APPPATH.'core/'.ucfirst($class).EXT)) 
 		{
 			include_once $location;
 			return;
 		}		
 		
-		/* autoload library classes */
+		// 加载'application/libraries/'目录下的类文件
 		if(is_file($location = APPPATH.'libraries/'.ucfirst($class).EXT)) 
 		{
 			include_once $location;
@@ -141,14 +149,21 @@ class Modules
 		}		
 	}
 
-	/** Load a module file **/
+    /**
+     * 加载模块文件
+     * @param $file            - routes
+     * @param $path            - APPPATH . 'modules/test/config/'
+     * @param string $type     - route
+     * @param bool $result     - true
+     * @return bool
+     */
 	public static function load_file($file, $path, $type = 'other', $result = TRUE)	
 	{
 		$file = str_replace(EXT, '', $file);		
-		$location = $path.$file.EXT;
-		
-		if ($type === 'other') 
-		{			
+		$location = $path.$file.EXT;// $location = APPPATH . 'modules/test/config/routes.php'
+
+		if ($type === 'other')
+		{
 			if (class_exists($file, FALSE))	
 			{
 				log_message('debug', "File already loaded: {$location}");				
@@ -158,9 +173,10 @@ class Modules
 		} 
 		else 
 		{
-			/* load config or language array */
+			/* 加载配置文件或语言文件 */
 			include $location;
 
+            // 这里的$type可以是config route autoload language
 			if ( ! isset($$type) OR ! is_array($$type))				
 				show_error("{$location} does not contain a valid {$type} array");
 
@@ -170,35 +186,41 @@ class Modules
 		return $result;
 	}
 
-	/** 
-	* Find a file
-	* Scans for files located within modules directories.
-	* Also scans application directories for models, plugins and views.
-	* Generates fatal error if file not found.
-	**/
+    /**
+     * 从模块中寻找指定文件，比如从模块配置目录找路由文件
+     * @param $file     -   routes
+     * @param $module   -   test | welcome
+     * @param $base     -   config/
+     * @return array
+     */
 	public static function find($file, $module, $base) 
 	{
 		$segments = explode('/', $file);
 
 		$file = array_pop($segments);
-		$file_ext = (pathinfo($file, PATHINFO_EXTENSION)) ? $file : $file.EXT;
+		// pathinfo($file, PATHINFO_EXTENSION)是从$file中获取扩展名
+		$file_ext = (pathinfo($file, PATHINFO_EXTENSION)) ? $file : $file.EXT;// routes.php
 		
-		$path = ltrim(implode('/', $segments).'/', '/');	
-		$module ? $modules[$module] = $path : $modules = array();
-		
+		$path = ltrim(implode('/', $segments).'/', '/');// 获取子目录
+		$module ? $modules[$module] = $path : $modules = array();// $modules['test'] = '';
+
+        // 入参$file如果是test/config/routes就能直接确定module是test了
 		if ( ! empty($segments)) 
 		{
 			$modules[array_shift($segments)] = ltrim(implode('/', $segments).'/','/');
 		}	
 
+		// Modules:$locations = [APPPATH . 'modules/' => '../modules/'];
 		foreach (Modules::$locations as $location => $offset) 
-		{					
+		{					     // test => ''
 			foreach($modules as $module => $subpath) 
-			{			
+			{
+			    // G:\CodeIgniter-HMVC\application\modules/welcome/config/
 				$fullpath = $location.$module.'/'.$base.$subpath;
 				
 				if ($base == 'libraries/' OR $base == 'models/')
 				{
+				    // libraries文件或models文件首字母大写
 					if(is_file($fullpath.ucfirst($file_ext))) return array($fullpath, ucfirst($file));
 				}
 				else
@@ -209,8 +231,13 @@ class Modules
 		
 		return array(FALSE, $file);	
 	}
-	
-	/** Parse module routes **/
+
+    /**
+     * 解析module路由
+     * @param $module test | welcome
+     * @param $uri    test/test/index | welcome//
+     * @return array|void
+     */
 	public static function parse_routes($module, $uri) 
 	{
 		/* load the route file */
@@ -218,19 +245,26 @@ class Modules
 		{
 			if (list($path) = self::find('routes', $module, 'config/'))
 			{
+			    // 因为welcome模块config目录下没有routes.php文件，所以$path = false
+                // test模块 => $path = APPPATH . 'modules/test/config/'
+                // 作用： 每一个模块可以包含一个config/routes.php文件，在文件中定义该模块的路由和默认控制器
 				$path && self::$routes[$module] = self::load_file('routes', $path, 'route');
 			}
 		}
 
+		// module为welcome没有在模块下找到配置文件，退出。如果是test则继续。
 		if ( ! isset(self::$routes[$module])) return;
 			
-		/* parse module routes */
+		/* 解析module路由 */
 		foreach (self::$routes[$module] as $key => $val) 
-		{						
+		{
+		    // $key中的通配符转换为正则表达式
 			$key = str_replace(array(':any', ':num'), array('.+', '[0-9]+'), $key);
-			
+
+			// 执行正则匹配
 			if (preg_match('#^'.$key.'$#', $uri)) 
-			{							
+			{
+			    // $val中存在'$'或者$key中存在'('则执行一个正则表达式的搜索和替换
 				if (strpos($val, '$') !== FALSE AND strpos($key, '(') !== FALSE) 
 				{
 					$val = preg_replace('#^'.$key.'$#', $val, $uri);

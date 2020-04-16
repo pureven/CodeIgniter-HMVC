@@ -40,7 +40,7 @@ class MX_Loader extends CI_Loader
 	public $_ci_plugins = array();
 	public $_ci_cached_vars = array();
 
-	/** Initialize the loader variables **/
+	// CI_Controller中调此方法
 	public function initialize($controller = NULL)
 	{
 		/* set the module name */
@@ -79,15 +79,16 @@ class MX_Loader extends CI_Loader
 
 		foreach (Modules::$locations as $location => $offset)
 		{
-			/* only add a module path if it exists */
+			/* 请求模块是否存在 */
 			if (is_dir($module_path = $location.$module.'/') && ! in_array($module_path, $this->_ci_model_paths))
 			{
+			    // 将模块放入_ci_model_paths说明可以在模块下加model目录，然后放入model文件
 				array_unshift($this->_ci_model_paths, $module_path);
 			}
 		}
 	}
 
-	/** Load a module config file **/
+	/** 加载模块配置文件 **/
 	public function config($file, $use_sections = FALSE, $fail_gracefully = FALSE)
 	{
 		return CI::$APP->config->load($file, $use_sections, $fail_gracefully, $this->_module);
@@ -242,9 +243,10 @@ class MX_Loader extends CI_Loader
 		return $this;
 	}
 
-	/** Load a module controller **/
+	/** 加载模块控制器 **/
 	public function module($module, $params = NULL)
 	{
+	    // 多个就通过modules()分别调用此方法
 		if (is_array($module)) return $this->modules($module);
 
 		$_alias = strtolower(basename($module));
@@ -252,7 +254,7 @@ class MX_Loader extends CI_Loader
 		return $this;
 	}
 
-	/** Load an array of controllers **/
+	/** 如果控制器是个数组则通过此方法循环单个调用 **/
 	public function modules($modules)
 	{
 		foreach ($modules as $_module) $this->module($_module);
